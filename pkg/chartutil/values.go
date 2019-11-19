@@ -171,6 +171,13 @@ func istable(v interface{}) bool {
 	return ok
 }
 
+// similarly, isarray is a special-purpose function to see if the present
+//  thing matches the definition of a YAML array.
+func isarray(v interface{}) bool {
+	_, ok := v.([]interface{})
+	return ok
+}
+
 // PathValue takes a path that traverses a YAML structure and returns the value at the end of that path.
 // The path starts at the root of the YAML structure and is comprised of YAML keys separated by periods.
 // Given the following YAML data the value at path "chapter.one.title" is "Loomings".

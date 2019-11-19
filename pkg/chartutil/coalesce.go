@@ -186,6 +186,8 @@ func CoalesceTables(dst, src map[string]interface{}) map[string]interface{} {
 	// Because dest has higher precedence than src, dest values override src
 	// values.
 	for key, val := range src {
+		// for table and array values, verify that dst and src are compatible,
+		//  and then coalesce recursively
 		if istable(val) {
 			switch innerdst, ok := dst[key]; {
 			case !ok:
@@ -195,6 +197,15 @@ func CoalesceTables(dst, src map[string]interface{}) map[string]interface{} {
 			default:
 				log.Printf("warning: cannot overwrite table with non table for %s (%v)", key, val)
 			}
+		} else if isarray(val) {
+			switch innerdst, ok := dst[key]; {
+			case !ok:
+				dst[key] = val
+			case isarray(innerdst):
+				CoalesceArrays(innerdst.([]interface{}), val.([]interface{}))
+			default:
+				log.Printf("warning: cannot overwrite array with non-array for %s (%v)", key, val)
+			}
 		} else if dv, ok := dst[key]; ok && istable(dv) {
 			log.Printf("warning: destination for %s is a table. Ignoring non-table value %v", key, val)
 		} else if !ok { // <- ok is still in scope from preceding conditional.
@@ -202,4 +213,26 @@ func CoalesceTables(dst, src map[string]interface{}) map[string]interface{} {
 		}
 	}
 	return dst
+}
+
+// similar to above, dst will be authoritative and
+//  came from CLI overrides; src came from chart values.yaml
+func CoalesceArrays(dst, src []interface{}) {
+	for i, dstEntry := range dst {
+		if i > len(src) {
+			// src was shorter than dst, nothing left to coalesce
+			break
+		}
+		srcEntry := src[i]
+		// handle recursive cases
+		if istable(dstEntry) {
+			CoalesceTables(dstEntry.(map[string]interface{}), srcEntry.(map[string]interface{}))
+		} else if isarray(dstEntry) {
+			CoalesceArrays(dstEntry.([]interface{}), srcEntry.([]interface{}))
+		} else if dstEntry == nil {
+			// this is good reason to trust the src entry in the array
+			dst[i] = srcEntry
+		}
+		// else dst is to be used unmodified
+	}
 }
